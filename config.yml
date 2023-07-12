@@ -1,0 +1,5 @@
+MQTT_BROKER_URL: broker.hivemq.com
+MQTT_LOGGING: true
+LOGGING_FILE: flask_mqtt.log
+LOGGING_LEVEL: 10
+LOGGING_FORMAT: "%(asctime)s--%(name)s--%(levelname)s--%(message)s"
