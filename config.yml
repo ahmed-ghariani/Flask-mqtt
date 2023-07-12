@@ -3,3 +3,5 @@ MQTT_LOGGING: true
 LOGGING_FILE: flask_mqtt.log
 LOGGING_LEVEL: 10
 LOGGING_FORMAT: "%(asctime)s--%(name)s--%(levelname)s--%(message)s"
+WEBSERVER_LOGGING_LEVEL: 20
+SQLALCHEMY_DATABASE_URI: csv:///?DataSource=MyCSVFilesFolder
