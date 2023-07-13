@@ -1,6 +1,6 @@
 import yaml, json, csv
 import logging
-from flask import Flask
+from flask import Flask, render_template
 from flask_mqtt import Mqtt
 
 app = Flask(__name__)
@@ -18,14 +18,17 @@ app_logger.name = "mqtt"  # change the logger name
 logging.getLogger("werkzeug").setLevel(cfg["WEBSERVER_LOGGING_LEVEL"])
 logging.info("app started")
 mqttc = Mqtt(app, mqtt_logging=cfg["MQTT_LOGGING"])
-conact_list = []
+contact_list = []
+fields = ["nom", "tel_num"]
 with open(cfg["CONTACT_FILE"], newline="") as f:
-    for contact in csv.DictReader(f):
-        conact_list.append(contact)
+    r = csv.DictReader(f)
+    fields = r.fieldnames
+    for contact in r:
+        contact_list.append(contact)
 
 
 def get_contact(contact_name):
-    for contact in conact_list:
+    for contact in contact_list:
         if contact["nom"] == contact_name:
             break
     if contact["nom"] == "default":
@@ -41,10 +44,10 @@ def add_contcat(name, number):
         app_logger.error("contact exist already " + str(contact))
     else:
         with open(cfg["CONTACT_FILE"], newline="", mode="w") as f:
-            writer = csv.DictWriter(f, ["nom", "tel_num"])
+            writer = csv.DictWriter(f, fields)
             writer.writeheader()
-            writer.writerow({"nom": name, "tel_num": number})
-            writer.writerows(conact_list)
+            contact_list.append({"nom": name, "tel_num": number})
+            writer.writerows(contact_list)
 
 
 def handle_gateway_responce(r):
@@ -95,3 +98,8 @@ def on_message(client, userdata, msg):
             app_logger.warning("bad format")
     elif t == "/gsm/resp":
         handle_gateway_responce(msg.payload.decode("utf-8"))
+
+
+@app.route("/")
+def get_user_list():
+    return render_template("index.html", l=contact_list)
