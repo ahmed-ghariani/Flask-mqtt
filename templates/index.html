@@ -1,60 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetworkLab GSM service</title>
-    <style>
-  * {
-    box-sizing: border-box;
-  }
-  header {
-    text-align: center;
-    padding: 2px;
-    font-size: 25px;
-  }
-  nav {
-    float: left;
-    width: 15%;
-    height: 300px;
-    background: #fff;
-    padding: 20px;
-  }
-  nav ul {
-    list-style-type: none;
-    padding: 0;
-  }
-  article {
-    float: left;
-    padding: 20px;
-    width: 70%;
-    background-color: #f1f1f1;
-    height: 300px; 
-  }
 
-  section::after {
-    content: "";
-    display: table;
-    clear: both;
-  }
-</style>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetworkLab GSM service</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script src="{{ url_for('static', filename='index.js') }}"></script>
 </head>
+
 <body>
   <header>
-        <h2>NetworkLab GSM service</h2>
-    </header>
-    <section>
-      <nav>
-        <ul id="contact_list">
+    <h2>NetworkLab GSM service</h2>
+  </header>
+  <section>
+    <nav>
+      <h2>Contact list</h2>
+      <ul id="contact_list">
         {% for contact in l %}
-            <li>{{contact.nom}}{{ contact.tel_num}}</a></li>
+        <li>
+          <button class="tablinks" onclick="showDetails(event,'{{contact.nom}}')">{{contact.nom}}</button>
+        </li>
         {% endfor %}
-        </ul>
-      </nav>
-      <article>
-        <h1>Home</h1>
-        <p>This is a home page.</p>
-      </article>
-    </section>
+        <li>
+          <button>+</button>
+        </li>
+      </ul>
+    </nav>
+    <article>
+
+      {% for contact in l %}
+      <form class="tabcontent" id="{{contact.nom}}" action="/update", method="post">
+        <label for="nom">name:</label><br>
+        <input id="nom" name="nom" type="text" value="{{contact.nom}}" required><br>
+        <label for="tel_num">phone number:</label><br>
+        <input id="tel_num" name="tel_num" type="tel" value="{{contact.tel_num}}" pattern="[0-9]{8}" required><br>
+        <label for="notif_options">notification options:</label><br>
+        <input type="checkbox" name="notif_options" id="c" value="c"></li>
+        <label for="c">Critical</label>
+        <input type="checkbox" name="notif_options" id="d" value="d"></li>
+        <label for="d">Down</label>
+        <input type="checkbox" name="notif_options" id="ur" value="ur"></li>
+        <label for="ur">Unreachable</label>
+        <input type="checkbox" name="notif_options" id="u" value="u"></li>
+        <label for="u">Unknown</label>
+        <input type="checkbox" name="notif_options" id="w" value="w"></li>
+        <label for="w">Warning</label>
+        <input type="checkbox" name="notif_options" id="r" value="r"></li>
+        <label for="r">Recovery/Ok</label>
+        <input type="checkbox" name="notif_options" id="f" value="f"></li>
+        <label for="f">Flapping</label>
+        <input type="checkbox" name="notif_options" id="dt" value="s"></li>
+        <label for="dt">Downtime</label><br>
+        <input type="submit" value="update">
+      </form>
+      {% endfor %}
+    </article>
+  </section> 
+
+
 </body>
+
 </html>

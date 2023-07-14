@@ -1,0 +1,63 @@
+html {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+}
+
+header {
+  text-align: center;
+  padding: 2px;
+  font-size: 25px;
+  background-color: #dddada;
+}
+nav {
+  float: left;
+  width: 15%;
+  overflow: hidden;
+  border-right: 1px solid #dddada;
+  background-color: #f1f1f1;
+  margin: 0;
+}
+nav ul {
+  list-style-type: none;
+  padding: 0;
+}
+nav ul button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  width: 100%;
+  transition: 0.3s;
+}
+nav ul button:hover {
+  background-color: #ddd;
+}
+nav ul button.active {
+  background-color: #ccc;
+}
+article {
+  float: left;
+  padding: 20px;
+  width: 85%;
+  background-color: #f1f1f1;
+}
+
+section{
+  flex-grow: 1;
+  display: flex;
+  flex-direction: row;
+}
+
+.tabcontent {
+  display: none;
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+} 

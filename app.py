@@ -1,6 +1,6 @@
 import yaml, json, csv
 import logging
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_mqtt import Mqtt
 
 app = Flask(__name__)
@@ -100,6 +100,12 @@ def on_message(client, userdata, msg):
         handle_gateway_responce(msg.payload.decode("utf-8"))
 
 
-@app.route("/")
+@app.get("/")
 def get_user_list():
     return render_template("index.html", l=contact_list)
+
+@app.post("/update")
+def update_contact():
+    for i in request.form:
+        print(i)
+    return 200
