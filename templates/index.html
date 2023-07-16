@@ -69,12 +69,13 @@
           <input type="checkbox" name="jours" id="{{day}}" value="{{day}}" />
           <label for="{{day}}">{{day | title}}</label>
           <span>
-            <input type="time" name="start" value="00:00" />
-            <input type="time" name="end" value="23:59" />
+            <input type="time" name="start" value="00:00" pattern="[0-9]{2}:[0-9]{2}" step="300"/>
+            <input type="time" name="end" value="23:59"   pattern="[0-2][0-9]:[0-5][0-9]" step="60"/>
           </span>
           <br />
           {% endfor %}
           <input type="submit" value="add" disabled />
+          <input type="button" value="delete" onclick="remove()" disabled />
         </form>
         {% block javascript %}
         <script>
@@ -116,12 +117,12 @@
 
           form.addEventListener("keyup", () => {
             const v = check_time();
-            inputs[inputs.length - 1].disabled = !(form.checkValidity() && v);
+            inputs[inputs.length - 2].disabled = !(form.checkValidity() && v);
           });
 
           form.addEventListener("change", () => {
             const v = check_time();
-            inputs[inputs.length - 1].disabled = !(form.checkValidity() && v);
+            inputs[inputs.length - 2].disabled = !(form.checkValidity() && v);
           });
 
           form.addEventListener("submit", (e) => {
@@ -147,16 +148,16 @@
                 },
                 method: "post",
                 body: JSON.stringify(value),
-              }).then((response) => {
+              })
+              .then((response) => {
                 if (response.status == 200) {
-                  links.forEach((l) => {
-                    if (l.innerText == form.name) l.innerText = value.nom;
-                  });
+                  links.find((l) => {return l.innerText == form.name;}).innerText = value.nom;
                   const i = contact_list.findIndex((c) => {
                     return c.nom == form.name;
                   });
                   contact_list[i] = value;
                   form.name = value.nom;
+                  inputs[inputs.length-2].disabled = true;
                 }
               });
             else
@@ -166,7 +167,8 @@
                 },
                 method: "post",
                 body: JSON.stringify(value),
-              }).then((response) => {
+              })
+              .then((response) => {
                 if (response.status == 201) {
                   contact_list = contact_list.concat(value);
                   newLink = document.createElement("button");
@@ -175,16 +177,28 @@
                     showDetails(event);
                   };
                   links[links.length - 2].before(newLink);
-                  links = document.querySelectorAll("nav button");
+                  links = Array.from(document.querySelectorAll("nav button"));
                   newLink.className += " active";
-                  inputs[inputs.length - 1].value = "update";
+                  inputs[inputs.length - 2].value = "update";
+                  inputs[inputs.length - 1].disabled = false;
                   form.name = value.nom;
                 }
               });
           });
+          function remove() {
+            if(confirm("deleteting "+ form.name+"confirm"))
+              fetch("http://localhost:5000/delete/" + form.name,{method: "delete"})
+              .then(r => {
+                contact_list = contact_list.filter(c => {return c.nom != form.name});
+                const link  = links.find(l =>{ return l.className.includes(" active")});
+                links= links.filter(l => {return l!=link});
+                link.remove();
+                clearForm();
+              });
+          }
           function fillForm(contact_name) {
             const contact = contact_list.find((c) => {
-              if (c.nom == contact_name) return c;
+              return c.nom == contact_name;
             });
             inputs.forEach((i) => {
               switch (i.type) {
@@ -202,9 +216,19 @@
                   i.value = "update";
                   i.disabled = true;
                   break;
+                case "button":
+                  i.disabled = contact_name == "default";
+                  break;
               }
-              form.name = contact_name;
             });
+            for (i = 0; i < 7; i++) {
+              if (inputs[12 + i].checked) {
+                const t = contact.temps[i].split("/");
+                times[2 * i].value = t[0];
+                times[2 * i + 1].value = t[1];
+              }
+            }
+            form.name = contact_name;
           }
           function clearForm() {
             links.forEach((link) => {
@@ -225,6 +249,10 @@
                   break;
                 case "submit":
                   i.value = "add";
+                  break;
+                case "button":
+                  i.disabled = true;
+                  break;
               }
             });
           }

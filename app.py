@@ -175,3 +175,12 @@ def update(contact_name):
         contact[i] = data[i]
     save_list()
     return "contact updated", 200
+
+@app.delete("/delete/<contact_name>")
+def delete(contact_name):
+    for c in contact_list:
+        if c["nom"] == contact_name:
+            break;
+    contact_list.remove(c)
+    save_list()
+    return "contact removed", 200
