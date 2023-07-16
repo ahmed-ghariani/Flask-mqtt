@@ -1,64 +1,244 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NetworkLab GSM service</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NetworkLab GSM service</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  <script src="{{ url_for('static', filename='index.js') }}"></script>
-</head>
+  <body>
+    <header>
+      <h2>NetworkLab GSM service</h2>
+    </header>
+    <section>
+      <nav>
+        <h2>Contact list</h2>
+        <div id="contact_list">
+          {% for contact in l %}
+          <button onclick="showDetails(event)">{{contact.nom}}</button>
+          {% endfor %}
+        </div>
+        <div>
+          <button onclick="clearForm()">+</button>
+        </div>
+      </nav>
+      <article>
+        <form id="form">
+          <label for="nom">name:</label><br />
+          <input
+            id="nom"
+            name="nom"
+            type="text"
+            value=""
+            required
+            autocomplete="off"
+          /><br />
+          <label for="tel_num">phone number:</label><br />
+          <input
+            id="tel_num"
+            name="tel_num"
+            type="tel"
+            value=""
+            pattern="[0-9]{8}"
+            required
+            autocomplete="off"
+          /><br />
+          <label for="notif_options">notification options:</label><br />
+          {% for notif in [ "CRITICAL", "DOWN", "UNREACHABLE", "UNKNOWN",
+          "WARNING", "RECOVERY", "FLAPPING", "DOWNTIME"] %}
+          <input
+            type="checkbox"
+            name="notif_options"
+            id="{{notif}}"
+            value="{{notif}}"
+          />
+          <label for="{{notif}}">{{notif | title}}</label>
+          {% endfor %} <br />
+          <span>Vocal</span>
+          <input type="radio" name="vocal" id="v_on" value="true" />
+          <label for="v_on">on</label>
+          <input type="radio" name="vocal" id="v_off" value="false" />
+          <label for="v_off">off</label><br />
+          <span>time</span><br />
+          {% for day in ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY",
+          "SATURDAY", "SUNDAY"] %}
+          <input type="checkbox" name="jours" id="{{day}}" value="{{day}}" />
+          <label for="{{day}}">{{day | title}}</label>
+          <span>
+            <input type="time" name="start" value="00:00" />
+            <input type="time" name="end" value="23:59" />
+          </span>
+          <br />
+          {% endfor %}
+          <input type="submit" value="add" disabled />
+        </form>
+        {% block javascript %}
+        <script>
+          let contact_list = {{ l | tojson }};
+          let links = Array.from(document.querySelectorAll("nav button"));
+          const form = document.getElementById("form");
+          const inputs = Array.from(document.querySelectorAll("form > input"));
+          const times = Array.from(
+            document.querySelectorAll("form span input")
+          );
+          clearForm();
 
-<body>
-  <header>
-    <h2>NetworkLab GSM service</h2>
-  </header>
-  <section>
-    <nav>
-      <h2>Contact list</h2>
-      <ul id="contact_list">
-        {% for contact in l %}
-        <li>
-          <button class="tablinks" onclick="showDetails(event,'{{contact.nom}}')">{{contact.nom}}</button>
-        </li>
-        {% endfor %}
-        <li>
-          <button>+</button>
-        </li>
-      </ul>
-    </nav>
-    <article>
+          function check_time() {
+            let r = true;
+            for (i = 0; i < 7; i++) {
+              if (inputs[12 + i].checked) {
+                const start = times[2 * i].value.split(":");
+                const end = times[2 * i + 1].value.split(":");
+                const startDate = new Date(0, 0, 0, start[0], start[1], 0);
+                const endDate = new Date(0, 0, 0, end[0], end[1], 0);
+                const diff = endDate.getTime() - startDate.getTime() > 0;
+                if (diff) {
+                  times[2 * i].setCustomValidity("");
+                  times[2 * i + 1].setCustomValidity("");
+                } else {
+                  times[2 * i].setCustomValidity("start must be less then end");
+                  times[2 * i + 1].setCustomValidity(
+                    "start must be less then end"
+                  );
+                  r = false;
+                }
+              } else {
+                times[2 * i].setCustomValidity("");
+                times[2 * i + 1].setCustomValidity("");
+              }
+            }
+            return r;
+          }
 
-      {% for contact in l %}
-      <form class="tabcontent" id="{{contact.nom}}" action="/update", method="post">
-        <label for="nom">name:</label><br>
-        <input id="nom" name="nom" type="text" value="{{contact.nom}}" required><br>
-        <label for="tel_num">phone number:</label><br>
-        <input id="tel_num" name="tel_num" type="tel" value="{{contact.tel_num}}" pattern="[0-9]{8}" required><br>
-        <label for="notif_options">notification options:</label><br>
-        <input type="checkbox" name="notif_options" id="c" value="c"></li>
-        <label for="c">Critical</label>
-        <input type="checkbox" name="notif_options" id="d" value="d"></li>
-        <label for="d">Down</label>
-        <input type="checkbox" name="notif_options" id="ur" value="ur"></li>
-        <label for="ur">Unreachable</label>
-        <input type="checkbox" name="notif_options" id="u" value="u"></li>
-        <label for="u">Unknown</label>
-        <input type="checkbox" name="notif_options" id="w" value="w"></li>
-        <label for="w">Warning</label>
-        <input type="checkbox" name="notif_options" id="r" value="r"></li>
-        <label for="r">Recovery/Ok</label>
-        <input type="checkbox" name="notif_options" id="f" value="f"></li>
-        <label for="f">Flapping</label>
-        <input type="checkbox" name="notif_options" id="dt" value="s"></li>
-        <label for="dt">Downtime</label><br>
-        <input type="submit" value="update">
-      </form>
-      {% endfor %}
-    </article>
-  </section> 
+          form.addEventListener("keyup", () => {
+            const v = check_time();
+            inputs[inputs.length - 1].disabled = !(form.checkValidity() && v);
+          });
 
+          form.addEventListener("change", () => {
+            const v = check_time();
+            inputs[inputs.length - 1].disabled = !(form.checkValidity() && v);
+          });
 
-</body>
-
+          form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const data = new FormData(event.target);
+            const value = Object.fromEntries(data.entries());
+            value.notif_options = data.getAll("notif_options");
+            value.jours = data.getAll("jours");
+            const start = data.getAll("start");
+            const end = data.getAll("end");
+            delete value.start;
+            delete value.end;
+            value.temps = [];
+            for (i = 0; i < 7; i++) {
+              if (inputs[12 + i].checked) {
+                value.temps = value.temps.concat(start[i]+"/"+end[i]);
+              }
+            };
+            if (e.submitter.value == "update")
+              fetch("http://localhost:5000/update/" + form.name, {
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                method: "post",
+                body: JSON.stringify(value),
+              }).then((response) => {
+                if (response.status == 200) {
+                  links.forEach((l) => {
+                    if (l.innerText == form.name) l.innerText = value.nom;
+                  });
+                  const i = contact_list.findIndex((c) => {
+                    return c.nom == form.name;
+                  });
+                  contact_list[i] = value;
+                  form.name = value.nom;
+                }
+              });
+            else
+              fetch("http://localhost:5000/add", {
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                method: "post",
+                body: JSON.stringify(value),
+              }).then((response) => {
+                if (response.status == 201) {
+                  contact_list = contact_list.concat(value);
+                  newLink = document.createElement("button");
+                  newLink.innerText = value.nom;
+                  newLink.onclick = (event) => {
+                    showDetails(event);
+                  };
+                  links[links.length - 2].before(newLink);
+                  links = document.querySelectorAll("nav button");
+                  newLink.className += " active";
+                  inputs[inputs.length - 1].value = "update";
+                  form.name = value.nom;
+                }
+              });
+          });
+          function fillForm(contact_name) {
+            const contact = contact_list.find((c) => {
+              if (c.nom == contact_name) return c;
+            });
+            inputs.forEach((i) => {
+              switch (i.type) {
+                case "text":
+                case "tel":
+                  i.value = contact[i.name];
+                  break;
+                case "checkbox":
+                  i.checked = contact[i.name].includes(i.id);
+                  break;
+                case "radio":
+                  i.checked = contact[i.name] == i.value;
+                  break;
+                case "submit":
+                  i.value = "update";
+                  i.disabled = true;
+                  break;
+              }
+              form.name = contact_name;
+            });
+          }
+          function clearForm() {
+            links.forEach((link) => {
+              link.className = link.className.replace(" active", "");
+            });
+            form.name = "";
+            inputs.forEach((i) => {
+              switch (i.type) {
+                case "text":
+                case "tel":
+                  i.value = "";
+                  break;
+                case "checkbox":
+                  i.checked = false;
+                  break;
+                case "radio":
+                  i.checked = i.value;
+                  break;
+                case "submit":
+                  i.value = "add";
+              }
+            });
+          }
+          function showDetails(evt) {
+            links.forEach((link) => {
+              link.className = link.className.replace(" active", "");
+            });
+            evt.currentTarget.className += " active";
+            let contact_name = evt.currentTarget.innerText;
+            fillForm(contact_name);
+          }
+        </script>
+        {% endblock %}
+      </article>
+    </section>
+  </body>
 </html>

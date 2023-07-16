@@ -1,6 +1,7 @@
 import yaml, json, csv
 import logging
-from flask import Flask, render_template, request
+from datetime import datetime, time
+from flask import Flask, render_template, request, make_response
 from flask_mqtt import Mqtt
 
 app = Flask(__name__)
@@ -19,35 +20,66 @@ logging.getLogger("werkzeug").setLevel(cfg["WEBSERVER_LOGGING_LEVEL"])
 logging.info("app started")
 mqttc = Mqtt(app, mqtt_logging=cfg["MQTT_LOGGING"])
 contact_list = []
-fields = ["nom", "tel_num"]
-with open(cfg["CONTACT_FILE"], newline="") as f:
-    r = csv.DictReader(f)
-    fields = r.fieldnames
-    for contact in r:
-        contact_list.append(contact)
+fields = ["nom", "tel_num", "notif_options", "vocal", "jours", "temps"]
+default = {
+    "nom": "default",
+    "tel_num": cfg["CONTACT_DEFAULT_NUMBER"],
+    "notif_options": ["DOWN"],
+    "vocal": True,
+    "jours": [],
+    "temps": [],
+}
+
+
+def save_list():
+    with open(cfg["CONTACT_FILE"], newline="", mode="w") as f:
+        writer = csv.DictWriter(f, fields)
+        writer.writeheader()
+        writer.writerows(contact_list)
+
+
+def load():
+    with open(cfg["CONTACT_FILE"], newline="") as f:
+        r = csv.DictReader(f)
+        for c in r:
+            c["notif_options"] = (
+                c["notif_options"].strip("][").replace("'", "").split(", ")
+            )
+            c["jours"] = (
+                c["jours"].strip("][").replace("'", "").split(", ")
+            )
+            c["temps"] = (
+                c["temps"].strip("][").replace("'", "").split(", ")
+            )
+            contact_list.append(c)
+        if len(contact_list) == 0:
+            app_logger.warning("no contact found adding the default ")
+            contact_list.append(default)
+        if contact_list[-1]["nom"] != "default":
+            app_logger.info(
+                "no default contact found at the end of the contact list adding it"
+            )
+            contact_list.append(default)
 
 
 def get_contact(contact_name):
+    if len(contact_list) == 0:
+        load()
     for contact in contact_list:
         if contact["nom"] == contact_name:
-            break
-    if contact["nom"] == "default":
-        app_logger.info(
-            "contact name '" + contact_name + "' not found using the default number"
-        )
+            return contact
+    app_logger.info(
+        "contact name '" + contact_name + "' not found using the default number"
+    )
     return contact
 
 
-def add_contcat(name, number):
-    contact = get_contact(name)
-    if contact["nom"] != "default":
-        app_logger.error("contact exist already " + str(contact))
-    else:
-        with open(cfg["CONTACT_FILE"], newline="", mode="w") as f:
-            writer = csv.DictWriter(f, fields)
-            writer.writeheader()
-            contact_list.append({"nom": name, "tel_num": number})
-            writer.writerows(contact_list)
+def add_contcat(contact):
+    with open(cfg["CONTACT_FILE"], newline="", mode="w") as f:
+        writer = csv.DictWriter(f, fields)
+        writer.writeheader()
+        contact_list.insert(-1, contact)
+        writer.writerows(contact_list)
 
 
 def handle_gateway_responce(r):
@@ -59,22 +91,35 @@ def handle_gateway_responce(r):
     else:
         gsm_logger.info(r)
 
+def check_time(days,times):
+    now = datetime.now()
+    try:
+        today = now.strftime("%A").upper()
+        i = days.index(today)
+        start_h, start_m, end_h, end_m = [int(k) for j in times[i].split("/") for k in j.split(":")]
+        if now.hour < start_h or now.hour > end_h:
+            return False
+        if now.hour == start_h and now.minute < start_m:
+            return False
+        if now.hour == end_h and now.minute > end_m:
+            return False
+        return True   
+    except ValueError:
+        return False
 
 def handel_notification(n):
-    if not (n["State"] in ["CRITICAL", "DOWN", "WARNING"]):
+    contact = get_contact(n["Name"])
+    if not (n["State"] in contact["notif_options"]):
+        print(contact["notif_options"].type())
         return
-    num = get_contact(n["Name"])["tel_num"]
-    name = n.pop("Name")
-    m = {"Msg": str(n).replace("{", "").replace("}", "").replace("'", "")}
-    n["Name"] = name
-    n["Num"] = num
-    n["Vocal"] = n["State"] in ["CRITICAL", "DOWN"]
-    m["Num"] = "+216" + num
-    m["Name"] = name
-    m["Vocal"] = n["Vocal"]
-    mqttc.publish("/gsm/cmd", json.dumps(n).encode("utf-8"))
-    mqttc.publish("/gsm/cmd1", json.dumps(m).encode("utf-8"))
-    mqttc.publish("/gsm/cmd2", json.dumps(m).replace('"', '\\"').encode("utf-8"))
+    if not check_time(contact["jours"],contact["temps"]):
+        return
+    n.pop("Name")
+    m = {"Msg": str(n).strip("{}").replace("'","")}
+    m["Num"] = "+216" + contact["tel_num"]
+    m["Vocal"] = contact["vocal"]
+    mqttc.publish("/gsm/cmd", json.dumps(m).encode("utf-8"))
+    #mqttc.publish("/gsm/cmd2", json.dumps(m).replace('"', '\\"').encode("utf-8"))
 
 
 @mqttc.on_connect()
@@ -102,10 +147,31 @@ def on_message(client, userdata, msg):
 
 @app.get("/")
 def get_user_list():
+    global contact_list
+    contact_list = []
+    load()
     return render_template("index.html", l=contact_list)
 
-@app.post("/update")
-def update_contact():
-    for i in request.form:
-        print(i)
-    return 200
+
+@app.post("/add")
+def add():
+    data = request.get_json()
+    for c in contact_list:
+        if c["nom"] == data["nom"]:
+            return "contact name already used", 400
+    add_contcat(data)
+    return "contact added", 201
+
+
+@app.post("/update/<contact_name>")
+def update(contact_name):
+    data = request.get_json()
+    if data["nom"] != contact_name:
+        for c in contact_list:
+            if c["nom"] == data["nom"]:
+                return "contact name already used", 400
+    contact = get_contact(contact_name)
+    for i in contact.keys():
+        contact[i] = data[i]
+    save_list()
+    return "contact updated", 200

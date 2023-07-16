@@ -5,3 +5,4 @@ LOGGING_LEVEL: 10
 LOGGING_FORMAT: "%(asctime)s--%(name)s--%(levelname)s--%(message)s"
 WEBSERVER_LOGGING_LEVEL: 20
 CONTACT_FILE: contact.csv
+CONTACT_DEFAULT_NUMBER: "94960307"
