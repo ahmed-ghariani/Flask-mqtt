@@ -1,3 +1,4 @@
-nom,tel_num,notif_options,vocal,jours,temps
-userTest1,94960307,"['CRITICAL', 'DOWN', 'UNREACHABLE', 'UNKNOWN', 'WARNING']",true,"['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']","['00:00/23:59', '00:00/23:59', '00:00/23:59', '00:00/23:59', '00:00/23:59', '00:00/23:59', '00:00/23:59']"
-default,94960307,['DOWN'],true,[''],['']
+nom,tel_num,notif_options,vocal,jours,temps,intervale_date
+userTest1,94960307,"['CRITICAL', 'DOWN', 'UNREACHABLE', 'UNKNOWN', 'WARNING', 'RECOVERY', 'FLAPPING', 'DOWNTIME']",true,"['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']","['00:00/23:59', '00:00/23:59', '00:00/23:59', '00:00/23:59', '00:00/23:59', '00:00/23:59', '00:00/23:59']",2023-07-03/2023-07-26
+GreenLab,29292929,"['CRITICAL', 'DOWN', 'UNREACHABLE', 'UNKNOWN', 'WARNING', 'FLAPPING', 'DOWNTIME']",false,"['MONDAY', 'SUNDAY']","['00:00/23:59', '00:00/23:59']",
+default,94960307,['DOWN'],true,[''],[''],

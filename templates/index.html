@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="cache-control" content="no-cache" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="expires" content="0" />
     <title>NetworkLab GSM service</title>
     <link
       rel="stylesheet"
@@ -57,25 +60,44 @@
             value="{{notif}}"
           />
           <label for="{{notif}}">{{notif | title}}</label>
-          {% endfor %} <br />
+          {% endfor %}
+          <button onclick="check_all_notif_options(event)">check all</button>
+          <button onclick="uncheck_all_notif_options(event)">
+            uncheck all
+          </button>
+          <br />
           <span>Vocal</span>
           <input type="radio" name="vocal" id="v_on" value="true" />
           <label for="v_on">on</label>
           <input type="radio" name="vocal" id="v_off" value="false" />
           <label for="v_off">off</label><br />
-          <span>time</span><br />
+          <div>
+            <span>date interval</span>
+            from
+            <input
+              type="date"
+              name="start_date"
+              onchange="check_date_intervale()"
+            />
+            to <input type="date" name="end_date" />
+          </div>
+          <span>days/time</span><br />
           {% for day in ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY",
           "SATURDAY", "SUNDAY"] %}
           <input type="checkbox" name="jours" id="{{day}}" value="{{day}}" />
           <label for="{{day}}">{{day | title}}</label>
           <span>
-            <input type="time" name="start" value="00:00" pattern="[0-9]{2}:[0-9]{2}" step="300"/>
-            <input type="time" name="end" value="23:59"   pattern="[0-2][0-9]:[0-5][0-9]" step="60"/>
+            <input type="time" name="start" value="" />
+            <input type="time" name="end" value="" />
           </span>
           <br />
           {% endfor %}
+          <button onclick="always(event)">24x7</button>
+          <button onclick="dont_bother_me(event)">uncheck all</button>
+          <button onclick="only_on_working_days(event)">working days only</button><br />
           <input type="submit" value="add" disabled />
           <input type="button" value="delete" onclick="remove()" disabled />
+          
         </form>
         {% block javascript %}
         <script>
@@ -86,8 +108,67 @@
           const times = Array.from(
             document.querySelectorAll("form span input")
           );
+          const dateIntervale = Array.from(
+            document.querySelectorAll("form div input")
+          );
           clearForm();
-
+          function check_all_notif_options(event) {
+            event.preventDefault();
+            for (i = 0; i < 8; i++) {
+              inputs[2 + i].checked = true;
+            }
+            check_validity();
+          }
+          function uncheck_all_notif_options(event) {
+            event.preventDefault();
+            for (i = 0; i < 8; i++) {
+              inputs[2 + i].checked = false;
+            }
+            check_validity();
+          }
+          function always(event){
+            event.preventDefault();
+            for(i=0;i<7;i++){
+              inputs[12+i].checked = true;
+              times[2*i].value = "00:00";
+              times[2*i+1].value = "23:59";
+            }
+            check_validity();
+          }
+          function dont_bother_me(event){
+            event.preventDefault();
+            for(i=0;i<7;i++){
+              inputs[12+i].checked = false;
+              times[2*i].value = "";
+              times[2*i+1].value = "";
+            }
+            check_validity();
+          }
+          function only_on_working_days(event){
+            event.preventDefault();
+            for(i=0;i<6;i++){
+              inputs[12+i].checked = true;
+              times[2*i].value = "08:00";
+              times[2*i+1].value = "17:00";
+            }
+            inputs[12+6].checked = false;
+              times[2*6].value = "";
+              times[2*6+1].value = "";
+            check_validity();
+          }
+          function check_date_intervale() {
+            const startDate = dateIntervale[0].value;
+            if (startDate == "") {
+              dateIntervale[1].value = "";
+              dateIntervale[1].required = false;
+            } else {
+              const nextDay = new Date(
+                Date.parse(startDate) + 3600 * 24 * 1000
+              );
+              dateIntervale[1].min = nextDay.toISOString().split("T")[0];
+              dateIntervale[1].required = true;
+            }
+          }
           function check_time() {
             let r = true;
             for (i = 0; i < 7; i++) {
@@ -114,17 +195,12 @@
             }
             return r;
           }
-
-          form.addEventListener("keyup", () => {
+          function check_validity(){
             const v = check_time();
             inputs[inputs.length - 2].disabled = !(form.checkValidity() && v);
-          });
-
-          form.addEventListener("change", () => {
-            const v = check_time();
-            inputs[inputs.length - 2].disabled = !(form.checkValidity() && v);
-          });
-
+          }
+          form.addEventListener("keyup", check_validity);
+          form.addEventListener("change", check_validity);
           form.addEventListener("submit", (e) => {
             e.preventDefault();
             const data = new FormData(event.target);
@@ -135,12 +211,18 @@
             const end = data.getAll("end");
             delete value.start;
             delete value.end;
+            value.intervale_date = "";
+            if (value.start_date != "") {
+              value.intervale_date = value.start_date + "/" + value.end_date;
+            }
+            delete value.start_date;
+            delete value.end_date;
             value.temps = [];
             for (i = 0; i < 7; i++) {
               if (inputs[12 + i].checked) {
-                value.temps = value.temps.concat(start[i]+"/"+end[i]);
+                value.temps = value.temps.concat(start[i] + "/" + end[i]);
               }
-            };
+            }
             if (e.submitter.value == "update")
               fetch("http://localhost:5000/update/" + form.name, {
                 headers: {
@@ -148,16 +230,17 @@
                 },
                 method: "post",
                 body: JSON.stringify(value),
-              })
-              .then((response) => {
+              }).then((response) => {
                 if (response.status == 200) {
-                  links.find((l) => {return l.innerText == form.name;}).innerText = value.nom;
+                  links.find((l) => {
+                    return l.innerText == form.name;
+                  }).innerText = value.nom;
                   const i = contact_list.findIndex((c) => {
                     return c.nom == form.name;
                   });
                   contact_list[i] = value;
                   form.name = value.nom;
-                  inputs[inputs.length-2].disabled = true;
+                  inputs[inputs.length - 2].disabled = true;
                 }
               });
             else
@@ -167,8 +250,7 @@
                 },
                 method: "post",
                 body: JSON.stringify(value),
-              })
-              .then((response) => {
+              }).then((response) => {
                 if (response.status == 201) {
                   contact_list = contact_list.concat(value);
                   newLink = document.createElement("button");
@@ -186,12 +268,19 @@
               });
           });
           function remove() {
-            if(confirm("deleteting "+ form.name+"confirm"))
-              fetch("http://localhost:5000/delete/" + form.name,{method: "delete"})
-              .then(r => {
-                contact_list = contact_list.filter(c => {return c.nom != form.name});
-                const link  = links.find(l =>{ return l.className.includes(" active")});
-                links= links.filter(l => {return l!=link});
+            if (confirm("deleteting " + form.name + "confirm"))
+              fetch("http://localhost:5000/delete/" + form.name, {
+                method: "delete",
+              }).then((r) => {
+                contact_list = contact_list.filter((c) => {
+                  return c.nom != form.name;
+                });
+                const link = links.find((l) => {
+                  return l.className.includes(" active");
+                });
+                links = links.filter((l) => {
+                  return l != link;
+                });
                 link.remove();
                 clearForm();
               });
@@ -221,13 +310,30 @@
                   break;
               }
             });
-            for (i = 0; i < 7; i++) {
+            for (i = 0, j = 0; i < 7; i++) {
               if (inputs[12 + i].checked) {
-                const t = contact.temps[i].split("/");
+                const t = contact.temps[j].split("/");
                 times[2 * i].value = t[0];
                 times[2 * i + 1].value = t[1];
+                j++;
+              } else {
+                times[2 * i].value = "";
+                times[2 * i + 1].value = "";
               }
             }
+            if (contact.intervale_date != "") {
+              const dates = contact.intervale_date.split("/");
+              dateIntervale[0].value = dates[0];
+              dateIntervale[1].value = dates[1];
+              dateIntervale[1].required = true;
+              const nextDay = new Date(Date.parse(dates[0]) + 3600 * 24 * 1000);
+              dateIntervale[1].min = nextDay.toISOString().split("T")[0];
+            } else
+              dateIntervale.forEach((d_input) => {
+                d_input.value = "";
+                d_input.required = false;
+                d_input.min = "";
+              });
             form.name = contact_name;
           }
           function clearForm() {
@@ -254,6 +360,14 @@
                   i.disabled = true;
                   break;
               }
+            });
+            times.forEach((t_input) => {
+              t_input.value = "";
+            });
+            dateIntervale.forEach((d_input) => {
+              d_input.value = "";
+              d_input.required = false;
+              d_input.min = "";
             });
           }
           function showDetails(evt) {

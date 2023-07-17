@@ -20,7 +20,7 @@ logging.getLogger("werkzeug").setLevel(cfg["WEBSERVER_LOGGING_LEVEL"])
 logging.info("app started")
 mqttc = Mqtt(app, mqtt_logging=cfg["MQTT_LOGGING"])
 contact_list = []
-fields = ["nom", "tel_num", "notif_options", "vocal", "jours", "temps"]
+fields = ["nom", "tel_num", "notif_options", "vocal", "jours", "temps","intervale_date"]
 default = {
     "nom": "default",
     "tel_num": cfg["CONTACT_DEFAULT_NUMBER"],
@@ -91,8 +91,12 @@ def handle_gateway_responce(r):
     else:
         gsm_logger.info(r)
 
-def check_time(days,times):
+def check_time(days,times,intervale):
     now = datetime.now()
+    if intervale != "" :
+        dates = [datetime.strptime(i,"YYYY-mm-dd") for i in intervale.split("/")]
+        if now < dates[0] or now > dates[1]:
+            return False
     try:
         today = now.strftime("%A").upper()
         i = days.index(today)
@@ -110,7 +114,6 @@ def check_time(days,times):
 def handel_notification(n):
     contact = get_contact(n["Name"])
     if not (n["State"] in contact["notif_options"]):
-        print(contact["notif_options"].type())
         return
     if not check_time(contact["jours"],contact["temps"]):
         return
