@@ -2,3 +2,4 @@ __pycache__
 flask_mqtt.log
 .vscode
 main.py
+flask_mqtt.log.*

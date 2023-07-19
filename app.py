@@ -1,17 +1,20 @@
 import yaml, json, csv
 import logging
-from datetime import datetime, time
-from flask import Flask, render_template, request, make_response
+import logging.handlers as handlers
+from datetime import datetime
+from flask import Flask, render_template, request
 from flask_mqtt import Mqtt
 
 app = Flask(__name__)
 app.config.from_file("config.yml", load=yaml.full_load)
 cfg = app.config
+handler = handlers.TimedRotatingFileHandler(
+    filename=cfg["LOGGING_FILE"], when="midnight", backupCount=7
+)
 logging.basicConfig(
-    filename=cfg["LOGGING_FILE"],
-    filemode="a",
     format=cfg["LOGGING_FORMAT"],
     level=cfg["LOGGING_LEVEL"],
+    handlers=[handler],
 )
 gsm_logger = logging.getLogger("gsm")
 app_logger = logging.getLogger("flask_mqtt")
@@ -20,7 +23,15 @@ logging.getLogger("werkzeug").setLevel(cfg["WEBSERVER_LOGGING_LEVEL"])
 logging.info("app started")
 mqttc = Mqtt(app, mqtt_logging=cfg["MQTT_LOGGING"])
 contact_list = []
-fields = ["nom", "tel_num", "notif_options", "vocal", "jours", "temps","intervale_date"]
+fields = [
+    "nom",
+    "tel_num",
+    "notif_options",
+    "vocal",
+    "jours",
+    "temps",
+    "intervale_date",
+]
 default = {
     "nom": "default",
     "tel_num": cfg["CONTACT_DEFAULT_NUMBER"],
@@ -45,12 +56,8 @@ def load():
             c["notif_options"] = (
                 c["notif_options"].strip("][").replace("'", "").split(", ")
             )
-            c["jours"] = (
-                c["jours"].strip("][").replace("'", "").split(", ")
-            )
-            c["temps"] = (
-                c["temps"].strip("][").replace("'", "").split(", ")
-            )
+            c["jours"] = c["jours"].strip("][").replace("'", "").split(", ")
+            c["temps"] = c["temps"].strip("][").replace("'", "").split(", ")
             contact_list.append(c)
         if len(contact_list) == 0:
             app_logger.warning("no contact found adding the default ")
@@ -91,38 +98,42 @@ def handle_gateway_responce(r):
     else:
         gsm_logger.info(r)
 
-def check_time(days,times,intervale):
+
+def check_time(days, times, intervale):
     now = datetime.now()
-    if intervale != "" :
-        dates = [datetime.strptime(i,"YYYY-mm-dd") for i in intervale.split("/")]
+    if intervale != "":
+        dates = [datetime.strptime(i, "%Y-%m-%d") for i in intervale.split("/")]
         if now < dates[0] or now > dates[1]:
             return False
     try:
         today = now.strftime("%A").upper()
         i = days.index(today)
-        start_h, start_m, end_h, end_m = [int(k) for j in times[i].split("/") for k in j.split(":")]
+        start_h, start_m, end_h, end_m = [
+            int(k) for j in times[i].split("/") for k in j.split(":")
+        ]
         if now.hour < start_h or now.hour > end_h:
             return False
         if now.hour == start_h and now.minute < start_m:
             return False
         if now.hour == end_h and now.minute > end_m:
             return False
-        return True   
+        return True
     except ValueError:
         return False
+
 
 def handel_notification(n):
     contact = get_contact(n["Name"])
     if not (n["State"] in contact["notif_options"]):
         return
-    if not check_time(contact["jours"],contact["temps"]):
+    if not check_time(contact["jours"], contact["temps"], contact["intervale_date"]):
         return
     n.pop("Name")
-    m = {"Msg": str(n).strip("{}").replace("'","")}
+    m = {"Msg": str(n).strip("{}").replace("'", "")}
     m["Num"] = "+216" + contact["tel_num"]
     m["Vocal"] = contact["vocal"]
     mqttc.publish("/gsm/cmd", json.dumps(m).encode("utf-8"))
-    #mqttc.publish("/gsm/cmd2", json.dumps(m).replace('"', '\\"').encode("utf-8"))
+    # mqttc.publish("/gsm/cmd2", json.dumps(m).replace('"', '\\"').encode("utf-8"))
 
 
 @mqttc.on_connect()
@@ -179,11 +190,12 @@ def update(contact_name):
     save_list()
     return "contact updated", 200
 
+
 @app.delete("/delete/<contact_name>")
 def delete(contact_name):
     for c in contact_list:
         if c["nom"] == contact_name:
-            break;
+            break
     contact_list.remove(c)
     save_list()
     return "contact removed", 200

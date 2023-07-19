@@ -1,4 +1,4 @@
-MQTT_BROKER_URL: broker.hivemq.com
+MQTT_BROKER_URL: localhost
 MQTT_LOGGING: true
 LOGGING_FILE: flask_mqtt.log
 LOGGING_LEVEL: 10
