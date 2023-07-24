@@ -2,6 +2,7 @@ import yaml, json, csv
 import logging
 import logging.handlers as handlers
 from datetime import datetime
+from queue import Queue
 from flask import Flask, render_template, request
 from flask_mqtt import Mqtt
 
@@ -21,8 +22,10 @@ app_logger = logging.getLogger("flask_mqtt")
 app_logger.name = "mqtt"  # change the logger name
 logging.getLogger("werkzeug").setLevel(cfg["WEBSERVER_LOGGING_LEVEL"])
 logging.info("app started")
-mqttc = Mqtt(app, mqtt_logging=cfg["MQTT_LOGGING"])
+mqttc = Mqtt(mqtt_logging=cfg["MQTT_LOGGING"])
 contact_list = []
+notif_queue = Queue()
+gsm_busy = False
 fields = [
     "nom",
     "tel_num",
@@ -90,6 +93,7 @@ def add_contcat(contact):
 
 
 def handle_gateway_responce(r):
+    global gsm_busy
     state = r.split(",")[0]
     if state == "WR":
         gsm_logger.warning(r)
@@ -97,6 +101,12 @@ def handle_gateway_responce(r):
         gsm_logger.critical(r)
     else:
         gsm_logger.info(r)
+
+    if notif_queue.empty():
+        gsm_busy = False
+    else:
+        m = notif_queue.get()
+        mqttc.publish("/gsm/cmd", json.dumps(m).encode("utf-8"))
 
 
 def check_time(days, times, intervale):
@@ -123,6 +133,7 @@ def check_time(days, times, intervale):
 
 
 def handel_notification(n):
+    global gsm_busy
     contact = get_contact(n["Name"])
     if not (n["State"] in contact["notif_options"]):
         return
@@ -132,11 +143,12 @@ def handel_notification(n):
     m = {"Msg": str(n).strip("{}").replace("'", "")}
     m["Num"] = "+216" + contact["tel_num"]
     m["Vocal"] = contact["vocal"]
-    mqttc.publish("/gsm/cmd", json.dumps(m).encode("utf-8"))
-    # mqttc.publish("/gsm/cmd2", json.dumps(m).replace('"', '\\"').encode("utf-8"))
+    if gsm_busy:
+        notif_queue.put(m)
+    else:
+        mqttc.publish("/gsm/cmd", json.dumps(m).encode("utf-8"))
+        gsm_busy = True
 
-
-@mqttc.on_connect()
 def on_connect(client, userdata, flags, rc):
     app_logger.info("Connected with result code " + str(rc))
     mqttc.subscribe("/nagios/cmdApp")
@@ -144,7 +156,6 @@ def on_connect(client, userdata, flags, rc):
     mqttc.subscribe("/gsm/resp")
 
 
-@mqttc.on_message()
 def on_message(client, userdata, msg):
     t = msg.topic
     if t == "/nagios/pingApp":
@@ -199,3 +210,11 @@ def delete(contact_name):
     contact_list.remove(c)
     save_list()
     return "contact removed", 200
+
+
+mqttc._connect_handler = on_connect
+mqttc.client.on_message = on_message
+mqttc.init_app(app)
+
+if __name__ == "__main__":
+    app.run()
